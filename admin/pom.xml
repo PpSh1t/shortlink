@@ -60,6 +60,12 @@
             <scope>test</scope>
         </dependency>
 
+        <!--分库分表shardingsphere-->
+        <dependency>
+            <groupId>org.apache.shardingsphere</groupId>
+            <artifactId>shardingsphere-jdbc-core</artifactId>
+        </dependency>
+
     </dependencies>
     <build>
         <plugins>
