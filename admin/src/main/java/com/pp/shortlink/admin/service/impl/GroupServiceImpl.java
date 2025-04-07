@@ -1,14 +1,18 @@
 package com.pp.shortlink.admin.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.pp.shortlink.admin.dao.entity.GroupDO;
 import com.pp.shortlink.admin.dao.mapper.GroupMapper;
+import com.pp.shortlink.admin.dto.req.ShortLinkGroupSaveReqDTO;
 import com.pp.shortlink.admin.service.GroupService;
 import com.pp.shortlink.admin.toolkit.RandomCodeGenerator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Slf4j
 @Service
@@ -28,6 +32,18 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 .sortOrder(0)
                 .build();
         baseMapper.insert(groupDO);
+    }
+
+    @Override
+    public List<ShortLinkGroupSaveReqDTO> listGroup() {
+
+        LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
+                .eq(GroupDO::getDelFlag, 0)
+                //TODO 从当前上下文获取用户名
+                .eq(GroupDO::getUsername, "makise")
+                .orderByDesc(GroupDO::getSortOrder, GroupDO::getUpdateTime);
+        List<GroupDO> groupDOList = baseMapper.selectList(queryWrapper);
+        return BeanUtil.copyToList(groupDOList, ShortLinkGroupSaveReqDTO.class);
     }
 
     private boolean availableGid(String gid) {
