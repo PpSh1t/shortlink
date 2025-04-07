@@ -150,7 +150,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         stringRedisTemplate.opsForHash().put("login_" + requestParam.getUsername(), uuid, JSON.toJSONString(userDO));
 
         //设置 Redis 键的过期时间为 30 分钟。
-        stringRedisTemplate.expire("login_" + requestParam.getUsername(), 30L, TimeUnit.MINUTES);
+        stringRedisTemplate.expire("login_" + requestParam.getUsername(), 30L, TimeUnit.DAYS);
 
         //将生成的 uuid 封装到响应对象中，返回给调用方。
         return new UserLoginRespDTO(uuid);
