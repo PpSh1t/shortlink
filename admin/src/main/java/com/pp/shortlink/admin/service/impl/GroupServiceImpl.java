@@ -2,12 +2,14 @@ package com.pp.shortlink.admin.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.pp.shortlink.admin.common.biz.user.UserContext;
 import com.pp.shortlink.admin.dao.entity.GroupDO;
 import com.pp.shortlink.admin.dao.mapper.GroupMapper;
 import com.pp.shortlink.admin.dto.req.ShortLinkGroupSaveReqDTO;
+import com.pp.shortlink.admin.dto.req.ShortLinkGroupUpdateReqDTO;
 import com.pp.shortlink.admin.service.GroupService;
 import com.pp.shortlink.admin.toolkit.RandomCodeGenerator;
 import lombok.extern.slf4j.Slf4j;
@@ -47,12 +49,24 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
         return BeanUtil.copyToList(groupDOList, ShortLinkGroupSaveReqDTO.class);
     }
 
+    @Override
+    public void updateGroup(ShortLinkGroupUpdateReqDTO requestParam) {
+        System.out.println("当前用户: "+UserContext.getUsername());
+        LambdaUpdateWrapper<GroupDO> updateWrapper = Wrappers.lambdaUpdate(GroupDO.class)
+                .eq(GroupDO::getGid, requestParam.getGid())
+                .eq(GroupDO::getUsername, UserContext.getUsername())
+                .eq(GroupDO::getDelFlag, 0);
+        GroupDO groupDO = new GroupDO();
+        groupDO.setName(requestParam.getName());
+        baseMapper.update(groupDO,updateWrapper);
+
+    }
+
     private boolean availableGid(String gid) {
         //生成六位数字字母随机数作为gid
         gid = RandomCodeGenerator.generateRandomCode();
         LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
                 .eq(GroupDO::getGid, gid)
-                //TODO 设置用户名
                 .eq(GroupDO::getUsername, UserContext.getUsername());
 
         GroupDO availableGroupFlag = baseMapper.selectOne(queryWrapper);
