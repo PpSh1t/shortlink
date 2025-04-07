@@ -1,0 +1,11 @@
+package com.pp.shortlink.admin.dto.req;
+
+import lombok.Data;
+
+@Data
+public class ShortLinkGroupSaveReqDTO {
+    /**
+     * 分组名称
+     */
+    private String name;
+}
