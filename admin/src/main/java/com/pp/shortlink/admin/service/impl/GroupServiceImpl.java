@@ -62,6 +62,19 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
 
     }
 
+    @Override
+    public void deleteGroup(String gid) {
+        System.out.println("当前用户: "+UserContext.getUsername());
+        LambdaUpdateWrapper<GroupDO> updateWrapper = Wrappers.lambdaUpdate(GroupDO.class)
+                .eq(GroupDO::getGid, gid)
+                .eq(GroupDO::getUsername, UserContext.getUsername())
+                .eq(GroupDO::getDelFlag, 0);
+        GroupDO groupDO = new GroupDO();
+        groupDO.setDelFlag(1);
+        baseMapper.update(groupDO,updateWrapper);
+
+    }
+
     private boolean availableGid(String gid) {
         //生成六位数字字母随机数作为gid
         gid = RandomCodeGenerator.generateRandomCode();
