@@ -54,4 +54,6 @@ public class ShortLinkCreateReqDTO {
     @TableField(value = "describe")
     private String describe;
 
+
+
 }
