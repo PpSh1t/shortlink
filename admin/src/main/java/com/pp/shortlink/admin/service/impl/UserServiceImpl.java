@@ -21,6 +21,7 @@ import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.BeanUtils;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -28,8 +29,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static com.pp.shortlink.admin.common.constant.RedisCacheConstant.LOCK_USER_REGISTER_KEY;
-import static com.pp.shortlink.admin.common.enums.UserErrorCodeEnum.USER_NAME_EXIST;
-import static com.pp.shortlink.admin.common.enums.UserErrorCodeEnum.USER_SAVE_ERROR;
+import static com.pp.shortlink.admin.common.enums.UserErrorCodeEnum.*;
 
 /**
  * 用户接口实现层
@@ -83,16 +83,20 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                 如果锁未成功获取（可能由于其他线程已持有锁），可能会导致注册失败或超时
             */
             if (lock.tryLock()) {
-                 /*
+                try {
+                    int inserted = baseMapper.insert(BeanUtil.toBean(requestParam, UserDO.class));
+                    if (inserted < 1) {
+                        //插入不成功，返回注册失败错误
+                        throw new ClientException(USER_SAVE_ERROR);
+                    }
+                } catch (DuplicateKeyException ex) {
+                    throw new ClientException(USER_EXIST);
+                }
+                /*
                     将 requestParam 转换为一个 UserDO 类型的对象，
                     然后通过 baseMapper.insert 方法将该对象插入到数据库中，
                     并返回插入操作的结果(如果插入成功，返回值一般为 1)
                   */
-                int inserted = baseMapper.insert(BeanUtil.toBean(requestParam, UserDO.class));
-                if (inserted < 1) {
-                    //插入不成功，返回注册失败错误
-                    throw new ClientException(USER_SAVE_ERROR);
-                }
                 //当前注册用户的用户名（requestParam.getUsername()）添加到布隆过滤器 userRegisterCachePenetrationBloomFilter 中
                 userRegisterCachePenetrationBloomFilter.add(requestParam.getUsername());
                 return;
