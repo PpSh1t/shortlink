@@ -8,9 +8,9 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.pp.shortlink.admin.common.biz.user.UserContext;
 import com.pp.shortlink.admin.dao.entity.GroupDO;
 import com.pp.shortlink.admin.dao.mapper.GroupMapper;
-import com.pp.shortlink.admin.dto.req.ShortLinkGroupSaveReqDTO;
 import com.pp.shortlink.admin.dto.req.ShortLinkGroupSortReqDTO;
 import com.pp.shortlink.admin.dto.req.ShortLinkGroupUpdateReqDTO;
+import com.pp.shortlink.admin.dto.resp.ShortLinkGroupRespDTO;
 import com.pp.shortlink.admin.service.GroupService;
 import com.pp.shortlink.admin.toolkit.RandomCodeGenerator;
 import lombok.extern.slf4j.Slf4j;
@@ -40,14 +40,14 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
     }
 
     @Override
-    public List<ShortLinkGroupSaveReqDTO> listGroup() {
+    public List<ShortLinkGroupRespDTO> listGroup() {
         System.out.println("当前查询的用户名是: " + UserContext.getUsername());
         LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
                 .eq(GroupDO::getDelFlag, 0)
                 .eq(GroupDO::getUsername, UserContext.getUsername())
                 .orderByDesc(GroupDO::getSortOrder, GroupDO::getUpdateTime);
         List<GroupDO> groupDOList = baseMapper.selectList(queryWrapper);
-        return BeanUtil.copyToList(groupDOList, ShortLinkGroupSaveReqDTO.class);
+        return BeanUtil.copyToList(groupDOList,ShortLinkGroupRespDTO.class);
     }
 
     @Override
