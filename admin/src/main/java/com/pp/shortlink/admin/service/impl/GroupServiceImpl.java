@@ -60,7 +60,6 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
         GroupDO groupDO = new GroupDO();
         groupDO.setName(requestParam.getName());
         baseMapper.update(groupDO,updateWrapper);
-
     }
 
     @Override
