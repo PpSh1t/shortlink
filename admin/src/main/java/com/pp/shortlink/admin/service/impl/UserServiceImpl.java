@@ -101,7 +101,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                   */
                 //当前注册用户的用户名（requestParam.getUsername()）添加到布隆过滤器 userRegisterCachePenetrationBloomFilter 中
                 userRegisterCachePenetrationBloomFilter.add(requestParam.getUsername());
-                groupService.saveGroup("默认分组");
+                groupService.saveGroup(requestParam.getUsername(),"默认分组");
                 return;
             }
             //没有获取到锁，则返回用户名已存在
