@@ -6,7 +6,10 @@ import com.pp.shortlink.project.dao.entity.ShortLinkDO;
 import com.pp.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.pp.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.pp.shortlink.project.dto.resp.ShortLinkCreateRespDTO;
+import com.pp.shortlink.project.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.pp.shortlink.project.dto.resp.ShortLinkPageRespDTO;
+
+import java.util.List;
 
 /**
  * 短链接接口层
@@ -26,4 +29,13 @@ public interface ShortLinkService extends IService<ShortLinkDO> {
      * @return 短链接分页返回结果
      */
     IPage<ShortLinkPageRespDTO> pageShortLink(ShortLinkPageReqDTO requestParam);
+
+
+    /**
+     * 查询短链接分组内数量
+     * @param requestParam  查询短链接分组内数量请求参数
+     * @return  查询短链接分组内响应
+     */
+    List<ShortLinkGroupCountQueryRespDTO> listShortLinkGroupCount(List<String> requestParam);
+
 }
