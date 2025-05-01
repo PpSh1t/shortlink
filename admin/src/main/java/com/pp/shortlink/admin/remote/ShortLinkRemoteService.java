@@ -1,6 +1,7 @@
 package com.pp.shortlink.admin.remote;
 
 import cn.hutool.http.HttpUtil;
+import cn.hutool.http.Method;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.TypeReference;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -38,7 +39,10 @@ public interface ShortLinkRemoteService {
      * @param requestParam  更新短链接请求参数
      */
     default void updateShortLink(ShortLinkUpdateReqDTO requestParam){
-        HttpUtil.post("http://127.0.0.1:8001/api/short-link/v1/update", JSON.toJSONString(requestParam));
+        HttpUtil.createRequest(Method.PUT, "http://127.0.0.1:8001/api/short-link/v1/update")
+                .body(JSON.toJSONString(requestParam))
+                .contentType("application/json")
+                .execute();
 
     }
 

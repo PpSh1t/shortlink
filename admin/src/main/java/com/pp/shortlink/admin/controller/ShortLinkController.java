@@ -38,6 +38,9 @@ public class ShortLinkController {
 
     /**
      * 修改短链接
+     *  "validDateType":1,
+     *  "validDate":"2025-01-01 00:00:00",
+     *  "describe":"123123"
      */
     @PutMapping("/api/short-link/admin/v1/update")
     public Result<Void> updateShortLink(@RequestBody ShortLinkUpdateReqDTO requestParam) {
