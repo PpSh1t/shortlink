@@ -39,9 +39,9 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
-import static com.pp.shortlink.project.common.constant.RedisKeyContent.GOTO_SHORT_LINK_KEY;
-import static com.pp.shortlink.project.common.constant.RedisKeyContent.LOCK_GOTO_SHORT_LINK_KEY;
+import static com.pp.shortlink.project.common.constant.RedisKeyContent.*;
 
 /**
  * 短链接接口实现层
@@ -191,8 +191,17 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         if (StrUtil.isNotBlank(originalLink)) {
             ((HttpServletResponse) response).sendRedirect(originalLink);
             return;
-
         }
+        boolean contains = shortUriCreateCachePenetrationBloomFilter.contains(fullShortUrl);
+        if(!contains) {
+            return;
+        }
+        String gotoIsNullShortLink = stringRedisTemplate.opsForValue().get(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl));
+        if(StrUtil.isNotBlank(gotoIsNullShortLink)) {
+            return;
+        }
+
+
         RLock lock = redissonClient.getLock(String.format(LOCK_GOTO_SHORT_LINK_KEY, fullShortUrl));
         lock.lock();
         try {
@@ -208,8 +217,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             ShortLinkGotoDO shortLinkGotoDO = shortLinkGotoMapper.selectOne(linkGotoQueryWrapper);
 
             if (shortLinkGotoDO == null) {
-                ((HttpServletResponse) response).setStatus(HttpServletResponse.SC_NOT_FOUND);
-                response.getWriter().write("null");
+                stringRedisTemplate.opsForValue().set(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl),"-",30, TimeUnit.MINUTES);
                 //严禁来说此处需要进行封控
                 return;
             }
