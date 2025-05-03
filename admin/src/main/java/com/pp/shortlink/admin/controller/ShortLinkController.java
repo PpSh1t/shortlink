@@ -50,11 +50,11 @@ public class ShortLinkController {
 
 
     /**
-     * 分页查询短链接
+     * 分页查询回收站短链接
      */
-    @GetMapping("/api/short-link/admin/v1/page")
+    @GetMapping("/api/short-link/admin/v1/recycle-bin/page")
     public Result<IPage<ShortLinkPageRespDTO>> pageShortLink(ShortLinkPageReqDTO requestParam) {
-      return shortLinkRemoteService.pageShortLink(requestParam);
+      return shortLinkRemoteService.pageRecycleBinShortLink(requestParam);
     }
 
 }
