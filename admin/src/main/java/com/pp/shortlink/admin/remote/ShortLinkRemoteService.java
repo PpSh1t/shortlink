@@ -6,13 +6,10 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.TypeReference;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.pp.shortlink.admin.common.convention.result.Result;
-import com.pp.shortlink.admin.remote.dto.req.RecycleBinSaveReqDTO;
-import com.pp.shortlink.admin.remote.dto.req.ShortLinkPageReqDTO;
+import com.pp.shortlink.admin.remote.dto.req.*;
+import com.pp.shortlink.admin.remote.dto.resp.ShortLinkCreateRespDTO;
 import com.pp.shortlink.admin.remote.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.pp.shortlink.admin.remote.dto.resp.ShortLinkPageRespDTO;
-import com.pp.shortlink.project.dto.req.ShortLinkCreateReqDTO;
-import com.pp.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
-import com.pp.shortlink.project.dto.resp.ShortLinkCreateRespDTO;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.HashMap;
@@ -108,9 +105,9 @@ public interface ShortLinkRemoteService {
      * @param requestParam 分页短链接请求参数
      * @return 查询短链接响应
      */
-    default Result<IPage<ShortLinkPageRespDTO>> pageRecycleBinShortLink(ShortLinkPageReqDTO requestParam) {
+    default Result<IPage<ShortLinkPageRespDTO>> pageRecycleBinShortLink(ShortLinkRecycleBinPageReqDTO requestParam) {
         Map<String, Object> resultMap = new HashMap<>();
-        resultMap.put("gid", requestParam.getGid());
+        resultMap.put("gidList", requestParam.getGidList());
         resultMap.put("current", requestParam.getCurrent());
         resultMap.put("size", requestParam.getSize());
         String resultPageStr = HttpUtil.get("http://127.0.0.1:8001/api/short-link/v1/recycle-bin/page", resultMap);
