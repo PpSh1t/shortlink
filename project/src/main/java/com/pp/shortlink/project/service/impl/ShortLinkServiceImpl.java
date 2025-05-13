@@ -3,6 +3,8 @@ package com.pp.shortlink.project.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.date.Week;
+import cn.hutool.core.lang.UUID;
+import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -30,6 +32,8 @@ import com.pp.shortlink.project.toolkit.HashUtil;
 import com.pp.shortlink.project.toolkit.LinkUtil;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
@@ -46,11 +50,9 @@ import org.springframework.stereotype.Service;
 
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.pp.shortlink.project.common.constant.RedisKeyContent.*;
 
@@ -273,8 +275,67 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
      * 短链接跳转统计
      */
     private void shortLinkStats(String fullShortUrl, String gid, ServletRequest request, ServletResponse response) {
+        //检查请求中是否包含名为 "uv" 的 Cookie，
+        // 如果没有，就生成一个新的 UUID 并设置到 Cookie 中；
+        // 如果有，就将该 UUID 添加到 Redis 的 UV 统计集合中，并标记是否为首次访问。
+
+        //创建一个 AtomicBoolean 变量 uvFirstFlag，用于线程安全地记录该访客是否是第一次访问。
+        //从请求中提取所有的 Cookie，返回的是 Cookie[] 数组。
+        AtomicBoolean uvFirstFlag = new AtomicBoolean();
+        Cookie[] cookies = ((HttpServletRequest) request).getCookies();
+
         try {
-            if (StrUtil.isBlank(gid)){
+            Runnable addResponseCookieTask = () -> {
+                //情况 2：不存在 uv Cookie（新访客）
+                //生成一个快速的UUID 并转为字符串
+                //UUID.fastUUID() 是 Hutool 工具库中提供的快速 UUID 生成方法，比标准 Java 的 UUID.randomUUID() 更高效
+                String uv = UUID.fastUUID().toString();
+
+                //作用：创建一个名为 uv 的 Cookie，值为上面生成的 UUID。
+                //浏览器收到这个 Cookie 后会在后续请求中自动带上。
+                Cookie uvCookie = new Cookie("uv", uv);
+
+                //设置 Cookie 的生命周期一个月。
+                uvCookie.setMaxAge(60 * 60 * 24 * 30);
+
+                //作用：设置 Cookie 的作用路径（Path）。
+                //StrUtil.sub(...) 是 Hutool 中的字符串截取函数。
+                //设置适用路径为当前链接的子路径
+                uvCookie.setPath(StrUtil.sub(fullShortUrl, fullShortUrl.indexOf("/"), fullShortUrl.length()));
+                ((HttpServletResponse) response).addCookie(uvCookie);
+
+                uvFirstFlag.set(Boolean.TRUE);
+                stringRedisTemplate.opsForSet().add("short-link:stats:uv:" + fullShortUrl, uv);
+            };
+
+            //使用 Hutool 的 ArrayUtil.isNotEmpty() 判断是否存在 Cookie。
+            //若有 Cookie 则继续处理，避免空指针异常。
+            if (ArrayUtil.isNotEmpty(cookies)) {
+                //使用 Java 8 Stream 流操作，筛选出名为 "uv" 的 Cookie。
+                //.findFirst()：找到第一个匹配项（如果有）。
+                Arrays.stream(cookies)
+                        .filter(each -> Objects.equals(each.getName(), "uv"))
+                        .findFirst()
+                        //若找到了 Cookie，提取其值（即 UUID）。
+                        //each 就是 uv 的 UUID 字符串值。
+                        .map(Cookie::getValue)
+                        .ifPresentOrElse(each -> {
+                            //情况 1：已存在 uv Cookie：
+                            //将该 uv 值添加进 Redis 中的一个 集合（Set），用于去重统计 UV。
+                            //Redis key 是：short-link:stats:uv:<fullShortUrl>。
+                            //如果该值是首次添加进 Set（即 Redis 中没有），added 返回 1，说明是首次访问。
+                            //利用 uvFirstFlag 标记该用户是否是第一次访问这个链接。
+                            Long uvAdded = stringRedisTemplate.opsForSet().add("short-link:stats:uv:" + fullShortUrl, each);
+                            uvFirstFlag.set(uvAdded != null && uvAdded > 0L);
+                        }, addResponseCookieTask);
+            } else {
+                addResponseCookieTask.run();
+            }
+            String remoteAddr = LinkUtil.getActualIp((HttpServletRequest) request);
+            Long uipAdded = stringRedisTemplate.opsForSet().add("short-link:stats:uip:" + fullShortUrl, remoteAddr);
+            boolean uipFirstFlag = uipAdded != null && uipAdded > 0L;
+
+            if (StrUtil.isBlank(gid)) {
                 LambdaQueryWrapper<ShortLinkGotoDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGotoDO.class)
                         .eq(ShortLinkGotoDO::getFullShortUrl, fullShortUrl);
                 ShortLinkGotoDO shortLinkGotoDO = shortLinkGotoMapper.selectOne(queryWrapper);
@@ -286,12 +347,12 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
             //获取周数
             Week week = DateUtil.dayOfWeekEnum(new Date());
-            int weekValue = week.getValue();
+            int weekValue = week.getIso8601Value();
 
             LinkAccessStatsDO linkAccessStatsDO = LinkAccessStatsDO.builder()
                     .pv(1)
-                    .uv(1)
-                    .uip(1)
+                    .uv(uvFirstFlag.get() ? 1 : 0)
+                    .uip(uipFirstFlag ? 1 : 0)
                     .hour(hour)
                     .weekday(weekValue)
                     .fullShortUrl(fullShortUrl)

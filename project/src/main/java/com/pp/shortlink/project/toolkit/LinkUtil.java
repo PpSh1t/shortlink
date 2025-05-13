@@ -3,6 +3,7 @@ package com.pp.shortlink.project.toolkit;
 
 import cn.hutool.core.date.DateUnit;
 import cn.hutool.core.date.DateUtil;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.Date;
 import java.util.Optional;
@@ -19,12 +20,37 @@ public class LinkUtil {
      * 根据一个有效期时间 validDate，计算当前时间到这个时间之间的毫秒数，
      * 也就是缓存还应该存在多久。
      * 如果传进来的 validDate 是 null，就返回一个默认的缓存时间。
+     *
      * @param validDate 有效期时间
      * @return 当前时间到这个时间之间的毫秒数
      */
     public static long getLinkCacheValidTime(Date validDate) {
         return Optional.ofNullable(validDate)
-                .map(each -> DateUtil.between(new Date(),each, DateUnit.MS ))
+                .map(each -> DateUtil.between(new Date(), each, DateUnit.MS))
                 .orElse(DEFAULT_CACHE_VALID_TIME);
     }
+
+
+    /**
+     * 获取请求的 IP 地址
+     *
+     * @param request
+     * @return
+     */
+    public static String getActualIp(HttpServletRequest request) {
+        String ipAddress = request.getHeader("X-Forwarded-For");
+
+        if (ipAddress == null || ipAddress.length() == 0 || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getHeader("Proxy-Client-IP");
+        }
+        if (ipAddress == null || ipAddress.length() == 0 || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getHeader("WL-Proxy-Client-IP");
+        }
+        if (ipAddress == null || ipAddress.length() == 0 || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getRemoteAddr();
+        }
+
+        return ipAddress;
+    }
+
 }
