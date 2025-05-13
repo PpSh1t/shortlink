@@ -34,8 +34,8 @@ public class LinkUtil {
     /**
      * 获取请求的 IP 地址
      *
-     * @param request
-     * @return
+     * @param request 请求
+     * @return ipAddress
      */
     public static String getActualIp(HttpServletRequest request) {
         String ipAddress = request.getHeader("X-Forwarded-For");
