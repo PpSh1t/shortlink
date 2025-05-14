@@ -53,6 +53,7 @@ import java.net.URL;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static com.pp.shortlink.project.common.constant.RedisKeyContent.*;
 import static com.pp.shortlink.project.common.constant.ShortLinkConstant.AMAP_REMOTE_URL;
@@ -73,6 +74,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final LinkLocaleStatsMapper linkLocaleStatsMapper;
     private final LinkOsStatsMapper linkOsStatsMapper;
     private final LinkBrowserStatsMapper linkBrowserStatsMapper;
+    private final LinkAccessLogsMapper linkAccessLogsMapper;
 
     @Value("${short-link.stats.locale.amap-key}")
     private String statsLocaleAmapKey;
@@ -292,15 +294,16 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         Cookie[] cookies = ((HttpServletRequest) request).getCookies();
 
         try {
+            AtomicReference<String> uv = new AtomicReference<>();
+
             Runnable addResponseCookieTask = () -> {
                 //情况 2：不存在 uv Cookie（新访客）
                 //生成一个快速的UUID 并转为字符串
                 //UUID.fastUUID() 是 Hutool 工具库中提供的快速 UUID 生成方法，比标准 Java 的 UUID.randomUUID() 更高效
-                String uv = UUID.fastUUID().toString();
-
+                uv.set(UUID.fastUUID().toString());
                 //作用：创建一个名为 uv 的 Cookie，值为上面生成的 UUID。
                 //浏览器收到这个 Cookie 后会在后续请求中自动带上。
-                Cookie uvCookie = new Cookie("uv", uv);
+                Cookie uvCookie = new Cookie("uv", uv.get());
 
                 //设置 Cookie 的生命周期一个月。
                 uvCookie.setMaxAge(60 * 60 * 24 * 30);
@@ -312,7 +315,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 ((HttpServletResponse) response).addCookie(uvCookie);
 
                 uvFirstFlag.set(Boolean.TRUE);
-                stringRedisTemplate.opsForSet().add("short-link:stats:uv:" + fullShortUrl, uv);
+                stringRedisTemplate.opsForSet().add("short-link:stats:uv:" + fullShortUrl, uv.get());
             };
 
             //使用 Hutool 的 ArrayUtil.isNotEmpty() 判断是否存在 Cookie。
@@ -327,6 +330,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                         //each 就是 uv 的 UUID 字符串值。
                         .map(Cookie::getValue)
                         .ifPresentOrElse(each -> {
+                            uv.set(each);
                             //情况 1：已存在 uv Cookie：
                             //将该 uv 值添加进 Redis 中的一个 集合（Set），用于去重统计 UV。
                             //Redis key 是：short-link:stats:uv:<fullShortUrl>。
@@ -369,20 +373,20 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
             //统计地区
             linkAccessStatsMapper.shortLinkStats(linkAccessStatsDO);
-            Map<String,Object> localeParamMap = new HashMap<>();
-            localeParamMap.put("key",statsLocaleAmapKey);
-            localeParamMap.put("ip",remoteAddr);
+            Map<String, Object> localeParamMap = new HashMap<>();
+            localeParamMap.put("key", statsLocaleAmapKey);
+            localeParamMap.put("ip", remoteAddr);
             String localeResultStr = HttpUtil.get(AMAP_REMOTE_URL, localeParamMap);
             JSONObject localeResultObj = JSON.parseObject(localeResultStr);
             String infoCode = localeResultObj.getString("infocode");
             LinkLocaleStatsDO linkLocaleStatsDO;
-            if(StrUtil.isNotBlank(infoCode) && StrUtil.equals(infoCode,"10000")) {
+            if (StrUtil.isNotBlank(infoCode) && StrUtil.equals(infoCode, "10000")) {
                 String province = localeResultObj.getString("province");
-                boolean unknownFlag = StrUtil.equals(province,"[]");
+                boolean unknownFlag = StrUtil.equals(province, "[]");
                 linkLocaleStatsDO = LinkLocaleStatsDO.builder()
-                        .province(unknownFlag ? "未知" :province)
-                        .city(unknownFlag? "未知":localeResultObj.getString("city"))
-                        .adcode(unknownFlag? "未知":localeResultObj.getString("adcode"))
+                        .province(unknownFlag ? "未知" : province)
+                        .city(unknownFlag ? "未知" : localeResultObj.getString("city"))
+                        .adcode(unknownFlag ? "未知" : localeResultObj.getString("adcode"))
                         .cnt(1)
                         .fullShortUrl(fullShortUrl)
                         .country("中国")
@@ -392,8 +396,9 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 linkLocaleStatsMapper.shortLinkLocaleStats(linkLocaleStatsDO);
 
                 //统计操作系统
+                String os = LinkUtil.getOs((HttpServletRequest) request);
                 LinkOsStatsDO linkOsStatsDO = LinkOsStatsDO.builder()
-                        .os(LinkUtil.getOs((HttpServletRequest) request))
+                        .os(os)
                         .cnt(1)
                         .fullShortUrl(fullShortUrl)
                         .gid(gid)
@@ -403,14 +408,27 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
 
                 //统计浏览器
+                String browser = LinkUtil.getBrowser((HttpServletRequest) request);
                 LinkBrowserStatsDO linkBrowserStatsDO = LinkBrowserStatsDO.builder()
-                        .browser(LinkUtil.getBrowser((HttpServletRequest) request))
+                        .browser(browser)
                         .cnt(1)
                         .fullShortUrl(fullShortUrl)
                         .gid(gid)
                         .date(new Date())
                         .build();
                 linkBrowserStatsMapper.shortLinkBrowserStats(linkBrowserStatsDO);
+
+                //统计访问日志
+                LinkAccessLogsDO linkAccessLogsDO = LinkAccessLogsDO.builder()
+                        .user(uv.get())
+                        .ip(remoteAddr)
+                        .browser(browser)
+                        .os(os)
+                        .gid(gid)
+                        .fullShortUrl(fullShortUrl)
+                        .build();
+                linkAccessLogsMapper.insert(linkAccessLogsDO);
+
             }
         } catch (Exception e) {
             log.error("短链接访问量统计异常", e);
